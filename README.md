@@ -13,7 +13,7 @@ Following major tasks have been performed in this study by the project participa
   <li> Development of Classification Models  </li>
 </ol>
 
-![alt text](sample_image.png)
+![alt text](Images/fig1.JPG)
 
 
 <h3> 1.1 Data Collection and preparation of Dataset </h3>
