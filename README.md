@@ -13,7 +13,7 @@ Following major tasks have been performed in this study by the project participa
   <li> Development of Classification Models  </li>
 </ol>
 
-![alt text](Images/fig 1.JPG)
+![alt text](Images/fig1.JPG)
 
 
 <h3> 1.1 Data Collection and preparation of Dataset </h3>
@@ -54,9 +54,59 @@ N-grams are basically a sequence of words in a text. We have used unigrams, bigr
 The complete text classification task was divided into two phases. The first phase includes the binary classification of text data into two categories “Requirement” and “Non-Requirement”. The text documents collected from industry included enormous text statements but some of those statements are important and some are not important. The statements that are labelled as “Requirements” basically define the project and it is important for professionals to read those statements to accomplish the project goals with complete satisfaction of Client and the statements labelled as “Non-Requirements” are just discussion statements which are not important and are just for discussion or elaborating the earlier requirement. Therefore, the complete text data is first categorized into two labels of Requirements and Non-Requirements. In the second phase of our study, we performed the multilabel text classification and in this task the requirement text was further categorized into three different categories associated to the different stakeholders and stages of construction project namely “Design”, “Construction” and operation and maintenance “O&M”. Classifying the text data into such categories will help each professional to
 find the text related to their tasks easily
 
+
 <h4> Phase-1: Binary Classification </h4>
 
-In first stage, the dataset comprising seventeen hundred twenty (1720) labelled statements was prepared from the text documents collected from industry practitioners. The dataset included 1291 Requirement statements and 429 Non-Requirement statements. The dataset was divided into testing and training dataset in ratio of 2:3. Figure 2 shows the distribution of statements into two categories in the complete dataset. Figure 3 shows the distribution of statements in the training dataset and Figure 4 shows the distribution of statements in the testing dataset.
+In first stage, the dataset comprising seventeen hundred twenty (1720) labelled statements was prepared from the text documents collected from industry practitioners. The dataset included 1291 Requirement statements and 429 Non-Requirement statements. The dataset was divided into testing and training dataset in ratio of 2:3. Figure 2 shows the distribution of statements into two categories in the complete dataset. 
 
-This dataset was used for binary classification considering different scenarios. Firstly, most common words in the categories were identified to have a look into the text in the two categories. Figure 5 shows the most common words in Requirement category and Figure 6 shows the most common words in the Non-Requirement category. Two different libraries namely NLTK and Spacy available in python were used in the pre-processing of text data and their effects on the accuracies of machine learning models used for binary text classification were observed. Table 1 shows the results of text classification using NLTK library for text pre-processing. Table 2 include the results of text classification using Spacy library for text pre-processing
+![alt text](Images/fig2.JPG)
 
+This dataset was used for binary classification considering different scenarios. Firstly, most common words in the categories were identified to have a look into the text in the two categories. Figure 3 shows the most common words in Requirement category and Figure 4 shows the most common words in the Non-Requirement category. Two different libraries namely NLTK and Spacy available in python were used in the pre-processing of text data and their effects on the accuracies of machine learning models used for binary text classification were observed. Table 1 shows the results of text classification using NLTK library for text pre-processing. Table 2 include the results of text classification using Spacy library for text pre-processing
+
+
+![alt text](Images/fig3.JPG)
+
+![alt text](Images/fig4.JPG)
+
+![alt text](Images/fig5.JPG)
+
+![alt text](Images/fig6.JPG)
+
+
+The performance of three different text classification models on our dataset were observed. Following three classifiers were used in first stage of our study.
+1. Naïve Bayesian (NB)
+2. Support Vector Machines (SVM)
+3. Logistic Regression (LR)
+
+
+In addition to this, n-gram based text classification was also performed. We used unigrams, bigrams and trigrams for our binary text classification task and the behaviour of models along with the variation in results were observed. In Bigram, the model considers a phrase of two consecutive words as a single token and similarly it considers a phrase of three consecutive words as a single token in trigram.
+
+![alt text](Images/fig7.JPG) 
+
+![alt text](Images/fig8.JPG)
+
+![alt text](Images/fig9.JPG)
+
+![alt text](Images/fig15.JPG)
+
+<h4> Phase-2: Multi-class Text Classification </h4>
+
+In stage 2, the requirements text was further categorized into three predefined classes namely “Design”, “Construction” and “O&M”. In this part of the project, we used more than 3000 statements in dataset that were unequally distributed along the three classes as shown in Figure 10. The following machine learning methods were used in this phase 2.
+
+1. Naïve Bayesian (NB)
+2. Support Vector Machines (SVM)
+3. Logistic Regression (LR)
+4. Feedforward Neural Networks
+
+In our reporting below, we have reported the model setting which provided the best results. For example, for the Feed Forward Network, we have tried different numbers of epochs, batch sizes, activation functions, number of hidden layers, and so on. However, the model settings specified below were proven to provide the best results across all what we have tested. For sure we haven’t tested all combinations for all models as this is virtually impossible to perform, but rather made random changes and tried to maintain the better results when they occur by modifying other variables in the models. 
+
+![alt text](Images/fig16.JPG)
+
+![alt text](Images/fig17.JPG)
+
+![alt text](Images/fig18.JPG)
+
+
+<h3> Conclussion </h3> 
+
+In conclusion, this study has found that the requirement processing task in civil construction industry can be automated using text mining and natural language processing techniques. The machine learning algorithms tested in this study has shown the promising results. The results obtained showed that the unigram-based text classification gives best performance than bigram or trigram base text classification on our data. Similarly, pre-processing using NLTK library gives better results for text classification than using Spacing library. Finally, support vector machines algorithm (SVM) algorithm has been found to be the best classification model to classify the text documents in to different categories. For binary as well as multiclass text classification, SVM gave better results than naïve Bayes, logistic regression and feedforward neural network with an accuracy of 98.44% for binary classification and 91.10% for multiclass text classification. This study is expected to reduce the reading time of industry professionals spent in extracting the important information from text documents.
