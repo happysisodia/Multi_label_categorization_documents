@@ -1,0 +1,271 @@
+import base64
+import string
+import re
+import spacy
+import gensim
+import logging
+import nltk
+import warnings
+import pandas as pd
+import numpy as np
+
+from tqdm import tqdm
+import seaborn as sns
+from numpy import random
+from itertools import islice
+from functools import reduce
+from bs4 import BeautifulSoup
+import matplotlib.pyplot as plt
+from collections import Counter
+from textblob import TextBlob, Word
+
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+
+from gensim.models import Word2Vec, Doc2Vec
+from gensim.models.doc2vec import TaggedDocument
+
+from keras import layers
+from keras.layers import Dense
+from keras.utils import np_utils
+from keras.models import Sequential
+from keras.wrappers.scikit_learn import KerasClassifier
+
+from sklearn import utils
+from sklearn.pipeline import Pipeline
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.preprocessing import LabelEncoder
+from sklearn.linear_model import SGDClassifier,LogisticRegression
+from sklearn.model_selection import cross_val_score, KFold, train_test_split
+from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer, TfidfTransformer
+#################################################################################################
+
+## hide warnings##
+warnings.filterwarnings('ignore')
+
+## reading the csv file
+Dataset = pd.read_csv('data.csv')
+Types_List = ['O&M','Design','Construction']
+
+
+
+#preprocessing
+
+#lowerCase
+def LowerCase(data):
+    data['Requirement'] = data['Requirement'].apply(lambda x: " ".join(x.lower() for x in x.split()))
+    return data
+#remove punctuation
+def RemovePunctuation (data):
+    data['Requirement'] = data['Requirement'].str.replace('[^\w\s]','')
+    return data
+#remove stopwords
+def RemoveStopWords (data):
+    stop = stopwords.words('english')
+    data['Requirement'] = data['Requirement'].apply(lambda x: " ".join(x for x in x.split() if x not in stop))
+    return data
+
+def CorrectSpelling (data):
+    data['Requirement'].apply(lambda x: str(TextBlob(x).correct()))
+    return data
+
+#remove common frequent words
+def RemoveFrequentWords (data, topFrequentNumber=10):
+    mask = data.Type.apply(lambda x: 'Design' in x)
+    FrequentDesign= pd.Series(' '.join(data[mask]['Requirement']).split()).value_counts()[:topFrequentNumber]
+    mask = data.Type.apply(lambda x: 'O&M' in x)
+    FrequentOM= pd.Series(' '.join(data[mask]['Requirement']).split()).value_counts()[:topFrequentNumber]
+    mask = data.Type.apply(lambda x: 'Construction' in x)
+    FrequentConstruction= pd.Series(' '.join(data[mask]['Requirement']).split()).value_counts()[:topFrequentNumber]
+    allFrequent=[list(FrequentDesign.index),FrequentOM.index.tolist(),FrequentConstruction.index.tolist()]
+    commonFrequent=list(reduce(set.intersection, [set(item) for item in allFrequent ]))
+    data['Requirement'] = data['Requirement'].apply(lambda x: " ".join(x for x in x.split() if x not in commonFrequent))
+    return data
+
+def RemoveUniqueWords (data):
+    counts= pd.Series(' '.join(data['Requirement']).split()).value_counts()
+    to_remove = counts[counts <= 1].index
+    data['Requirement'] = data['Requirement'].apply(lambda x: " ".join(x for x in x.split() if x not in to_remove))
+    return data
+
+def AddTokens (data):
+    data['Tokens'] = data['Requirement'].apply(lambda x: TextBlob(x).words)
+    return data
+
+def Stem(data):
+    st = PorterStemmer()
+    data['Requirement'].apply(lambda x: " ".join([st.stem(word) for word in x.split()]))
+    return data
+
+def Lemmatize(data):
+    data['Requirement'] = data['Requirement'].apply(lambda x: " ".join([Word(word).lemmatize() for word in x.split()]))
+    return data
+
+def BalanceData(data,numberofsamples=600):
+    data=data.groupby('Type').apply(lambda x: x.sample(numberofsamples)).reset_index(drop=True)
+    return data
+##########
+
+def GetTFIDF(data,maxNGramRange=1):
+    tfidf = TfidfVectorizer(max_features=1000, lowercase=True, analyzer='word',
+    stop_words= 'english',ngram_range=(1,maxNGramRange),sublinear_tf=True)
+    Dataset_vect = tfidf.fit_transform(Dataset['Requirement'])
+##    idf = tfidf.idf_
+##    print(dict(zip(tfidf.get_feature_names(), idf)))
+    return Dataset_vect
+
+def GetBagOfWords(data,maxNGramRange=1):
+    bow = CountVectorizer(max_features=1000, lowercase=True, ngram_range=(1,maxNGramRange),analyzer = "word")
+    Dataset_bow = bow.fit_transform(data['Requirement'])
+    return Dataset_bow
+def RemoveNonAlphabet(data):
+	data['Requirement'] = data['Requirement'].str.replace('[^0-9a-z #+_]','')
+	return data
+
+#################################
+##Dataset=Lemmatize(Dataset)
+Dataset= LowerCase(Dataset)
+Dataset=RemovePunctuation(Dataset)
+Dataset=RemoveStopWords(Dataset)
+##Dataset=RemoveFrequentWords(Dataset,10)
+##Dataset=RemoveNonAlphabet(Dataset)
+Dataset=RemoveUniqueWords(Dataset)
+##Dataset=AddTokens(Dataset)
+##tfidf= GetTFIDF(Dataset,5)
+##bow= GetBagOfWords(Dataset,2)
+Dataset=BalanceData(Dataset,680)
+#################################
+
+
+##################################preprocessing########################################
+Dataset['Requirement'].apply(lambda x: len(x.split(' '))).sum()
+X_train, X_test, y_train, y_test = train_test_split(Dataset.Requirement, Dataset.Type, random_state=120, test_size=0.3)
+################################## End of preprocessing########################################
+
+import multiprocessing
+cores = multiprocessing.cpu_count()
+
+################## Doc2vec + Logistic Regression ##################
+tqdm.pandas(desc="progress-bar")
+def label_sentences(corpus, label_type):
+    labeled = []
+    for i, v in enumerate(corpus):
+        label = label_type + '_' + str(i)
+        labeled.append(gensim.models.doc2vec.TaggedDocument(v.split(), [label]))
+    return labeled
+X_train = label_sentences(X_train, 'Train')
+X_test = label_sentences(X_test, 'Test')
+all_data = X_train + X_test
+
+model_dbow = Doc2Vec(dm=0, vector_size=300, negative=5, min_count=1, alpha=0.065, min_alpha=0.065, workers=cores)
+model_dbow.build_vocab([x for x in tqdm(all_data)])
+
+for epoch in range(30):
+    model_dbow.train(utils.shuffle([x for x in tqdm(all_data)]), total_examples=len(all_data), epochs=1)
+    model_dbow.alpha -= 0.002
+    model_dbow.min_alpha = model_dbow.alpha
+
+
+def get_vectors(model, corpus_size, vectors_size, vectors_type):
+    vectors = np.zeros((corpus_size, vectors_size))
+    for i in range(0, corpus_size):
+        prefix = vectors_type + '_' + str(i)
+        vectors[i] = model.docvecs[prefix]
+    return vectors
+    
+train_vectors_dbow = get_vectors(model_dbow, len(X_train), 300, 'Train')
+test_vectors_dbow = get_vectors(model_dbow, len(X_test), 300, 'Test')
+
+logreg = LogisticRegression(n_jobs=1, C=1e5)
+logreg.fit(train_vectors_dbow, y_train)
+logreg = logreg.fit(train_vectors_dbow, y_train)
+y_pred = logreg.predict(test_vectors_dbow)
+print("################## Doc2vec + Logistic Regression ##################")
+print('accuracy %s' % accuracy_score(y_pred, y_test))
+print(classification_report(y_test, y_pred,target_names=Types_List))
+print("###################################################################\n\n")
+###################################################################
+train, test = train_test_split(Dataset, test_size=0.3, random_state=42)
+import nltk
+from nltk.corpus import stopwords
+def tokenize_text(text):
+    tokens = []
+    for sent in nltk.sent_tokenize(text):
+        for word in nltk.word_tokenize(sent):
+            if len(word) < 2:
+                continue
+            tokens.append(word.lower())
+    return tokens
+
+train_tagged = train.apply(
+    lambda r: TaggedDocument(words=tokenize_text(r['Requirement']), tags=[r.Type]), axis=1)
+test_tagged = test.apply(
+    lambda r: TaggedDocument(words=tokenize_text(r['Requirement']), tags=[r.Type]), axis=1)
+
+from tqdm import tqdm
+
+model_dbow = Doc2Vec(dm=0, vector_size=300, negative=5, hs=0, min_count=2, sample = 0, workers=cores)
+model_dbow.build_vocab([x for x in tqdm(train_tagged.values)])
+
+for epoch in range(60):
+    model_dbow.train(utils.shuffle([x for x in tqdm(train_tagged.values)]), total_examples=len(train_tagged.values), epochs=1)
+    model_dbow.alpha -= 0.002
+    model_dbow.min_alpha = model_dbow.alpha
+    
+
+def vec_for_learning(model, tagged_docs):
+    sents = tagged_docs.values
+    targets, regressors = zip(*[(doc.tags[0], model.infer_vector(doc.words, steps=20)) for doc in sents])
+    return targets, regressors
+
+
+y_train, X_train = vec_for_learning(model_dbow, train_tagged)
+y_test, X_test = vec_for_learning(model_dbow, test_tagged)
+logreg = LogisticRegression(n_jobs=1, C=1e5)
+logreg.fit(X_train, y_train)
+y_pred = logreg.predict(X_test)
+from sklearn.metrics import accuracy_score, f1_score
+print('Testing accuracy %s' % accuracy_score(y_test, y_pred))
+print('Testing F1 score: {}'.format(f1_score(y_test, y_pred, average='weighted')))
+
+
+
+model_dmm = Doc2Vec(dm=1, dm_mean=1, vector_size=300, window=10, negative=5, min_count=1, workers=5, alpha=0.065, min_alpha=0.065)
+model_dmm.build_vocab([x for x in tqdm(train_tagged.values)])
+
+
+for epoch in range(100):
+    model_dmm.train(utils.shuffle([x for x in tqdm(train_tagged.values)]), total_examples=len(train_tagged.values), epochs=1)
+    model_dmm.alpha -= 0.002
+    model_dmm.min_alpha = model_dmm.alpha
+
+
+y_train, X_train = vec_for_learning(model_dmm, train_tagged)
+y_test, X_test = vec_for_learning(model_dmm, test_tagged)
+logreg.fit(X_train, y_train)
+y_pred = logreg.predict(X_test)
+print('Testing accuracy %s' % accuracy_score(y_test, y_pred))
+print('Testing F1 score: {}'.format(f1_score(y_test, y_pred, average='weighted')))
+
+model_dbow.delete_temporary_training_data(keep_doctags_vectors=True, keep_inference=True)
+model_dmm.delete_temporary_training_data(keep_doctags_vectors=True, keep_inference=True)
+
+
+from gensim.test.test_doc2vec import ConcatenatedDoc2Vec
+new_model = ConcatenatedDoc2Vec([model_dbow, model_dmm])
+
+def get_vectors(model, tagged_docs):
+    sents = tagged_docs.values
+    targets, regressors = zip(*[(doc.tags[0], model.infer_vector(doc.words, steps=20)) for doc in sents])
+    return targets, regressors
+
+
+
+y_train, X_train = get_vectors(new_model, train_tagged)
+y_test, X_test = get_vectors(new_model, test_tagged)
+logreg.fit(X_train, y_train)
+y_pred = logreg.predict(X_test)
+print('Testing accuracy %s' % accuracy_score(y_test, y_pred))
+print('Testing F1 score: {}'.format(f1_score(y_test, y_pred, average='weighted')))
+
